@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Ai Music AutoSpot"
-#define MyAppVersion "8.2.0"
+#define MyAppVersion "8.4.0"
 #define MyAppPublisher "Ai Music"
 #define MyAppURL "https://www.aimusic.com.tr"
 #define MyAppExeName "AiMusicAutoSpot.exe"

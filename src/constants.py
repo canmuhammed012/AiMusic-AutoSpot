@@ -1,7 +1,7 @@
 """Ses Montaj Uygulaması - Sabitler ve Yapılandırma"""
 
 # Uygulama Bilgileri
-APP_VERSION = "8.2.0"
+APP_VERSION = "8.4.0"
 APP_NAME = "Ai Music AutoSpot"
 FONT_FAMILY = "Roboto"
 
