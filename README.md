@@ -28,12 +28,31 @@ Otomatik ses montaj uygulaması - Spot tespiti, fon müziği entegrasyonu ve pro
 # Bağımlılıkları yükle
 pip install -r requirements.txt
 
+# FFmpeg'i indir ve proje klasörüne yerleştir
+# FFmpeg dosyaları GitHub'da yok (çok büyük olduğu için)
+# FFmpeg'i https://ffmpeg.org/download.html adresinden indirin
+# ve ffmpeg/bin/ klasörüne yerleştirin
+
 # Uygulamayı çalıştır
 python run.py
 
 # Setup dosyası oluştur
 build_setup_new.bat
 ```
+
+### FFmpeg Kurulumu (Geliştirme için)
+
+FFmpeg dosyaları GitHub'da bulunmuyor (dosya boyutu limiti nedeniyle). Geliştirme yapmak için:
+
+1. FFmpeg'i [resmi sitesinden](https://ffmpeg.org/download.html) indirin
+2. Windows build'i seçin
+3. `ffmpeg/bin/` klasörüne şu dosyaları yerleştirin:
+   - `ffmpeg.exe`
+   - `ffprobe.exe`
+   - `ffplay.exe`
+   - Tüm `.dll` dosyaları (`av*.dll`, `sw*.dll`, vb.)
+
+**Not:** Normal kullanıcılar için FFmpeg setup dosyasına dahil edilmiştir, ekstra kurulum gerekmez.
 
 ## Lisans
 
