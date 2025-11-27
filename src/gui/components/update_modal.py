@@ -159,8 +159,17 @@ class UpdateModal(ctk.CTkToplevel):
     
     def _format_release_notes(self, notes: str) -> str:
         """Sürüm notlarını formatlar ve emojiler ekler"""
-        if not notes:
-            return "• Geliştirilmiş performans\n• Hata düzeltmeleri\n• Genel iyileştirmeler"
+        # Varsayılan formatlanmış sürüm notları
+        default_notes = [
+            "🔄 Geliştirilmiş Senkronizasyon",
+            "🎵 Ses Analizi Geliştirmeleri",
+            "🎯 Spot Analiz Geliştirmeleri",
+            "🎨 Arayüz Güncellemeleri",
+            "🐛 Bug Fix"
+        ]
+        
+        if not notes or not notes.strip():
+            return '\n'.join(default_notes)
         
         # Markdown formatını temizle
         notes = notes.replace("##", "").replace("###", "").replace("#", "").strip()
@@ -169,19 +178,33 @@ class UpdateModal(ctk.CTkToplevel):
         lines = notes.split('\n')
         formatted_lines = []
         
-        # Emoji mapping
+        # Emoji mapping (daha kapsamlı)
         emoji_map = {
             "senkronizasyon": "🔄",
+            "sync": "🔄",
             "ses analizi": "🎵",
+            "audio": "🎵",
             "spot analiz": "🎯",
+            "spot": "🎯",
+            "analiz": "🎯",
             "arayüz": "🎨",
+            "ui": "🎨",
+            "interface": "🎨",
             "bug": "🐛",
             "fix": "🔧",
+            "hata": "🐛",
+            "düzeltme": "🔧",
             "geliştirme": "⚡",
             "iyileştirme": "✨",
+            "improvement": "✨",
             "performans": "🚀",
+            "performance": "🚀",
             "hata": "❌",
-            "düzeltme": "✅"
+            "error": "❌",
+            "düzeltme": "✅",
+            "yeni": "🆕",
+            "new": "🆕",
+            "feature": "🆕"
         }
         
         for line in lines:
@@ -194,7 +217,7 @@ class UpdateModal(ctk.CTkToplevel):
                 line = line.lstrip('-*•').strip()
             
             # Emoji ekle
-            emoji = "•"
+            emoji = "✨"  # Varsayılan emoji
             line_lower = line.lower()
             for key, emoji_char in emoji_map.items():
                 if key in line_lower:
@@ -205,13 +228,7 @@ class UpdateModal(ctk.CTkToplevel):
         
         # Eğer formatlanmış satır yoksa, varsayılan formatla
         if not formatted_lines:
-            formatted_lines = [
-                "🔄 Geliştirilmiş Senkronizasyon",
-                "🎵 Ses Analizi Geliştirmeleri",
-                "🎯 Spot Analiz Geliştirmeleri",
-                "🎨 Arayüz Güncellemeleri",
-                "🐛 Bug Fix"
-            ]
+            formatted_lines = default_notes
         
         return '\n'.join(formatted_lines)
     
