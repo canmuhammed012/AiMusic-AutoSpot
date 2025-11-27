@@ -23,6 +23,26 @@ _original_run = subprocess.run
 _original_check_call = subprocess.check_call
 _original_check_output = subprocess.check_output
 
+# Import hook için meta path finder
+class SubprocessImportHook:
+    """Subprocess modülü import edildiğinde otomatik patch uygular"""
+    def find_spec(self, name, path, target=None):
+        if name == 'subprocess':
+            # Subprocess modülü import edildiğinde patch'i uygula
+            try:
+                # Modülü import et ve patch'le
+                import importlib
+                mod = importlib.import_module('subprocess')
+                mod.Popen = _hidden_popen
+                mod.call = _hidden_call
+                mod.run = _hidden_run
+                mod.check_call = _hidden_check_call
+                mod.check_output = _hidden_check_output
+                logger.debug("Import hook ile subprocess patch'lendi")
+            except:
+                pass
+        return None
+
 def _hidden_popen(*args, **kwargs):
     """Gizli subprocess.Popen wrapper - CMD pencerelerini önler"""
     if sys.platform == "win32":
@@ -96,6 +116,14 @@ def _patch_pydub_subprocess():
     # Patch zaten uygulanmışsa tekrar uygulama
     if _subprocess_patched:
         return
+    
+    # 0. Import hook'u ekle (en erken aşamada patch için)
+    try:
+        if SubprocessImportHook not in sys.meta_path:
+            sys.meta_path.insert(0, SubprocessImportHook())
+            logger.debug("Subprocess import hook eklendi")
+    except Exception as e:
+        logger.debug(f"Import hook eklenemedi: {e}")
     
     # 1. Global subprocess modülünü tamamen patch et (en kritik)
     try:

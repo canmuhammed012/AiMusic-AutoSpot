@@ -6,6 +6,7 @@ import threading
 import random
 import json
 import time
+import subprocess
 from datetime import datetime
 import customtkinter as ctk
 from tkinter import messagebox, filedialog
@@ -27,6 +28,7 @@ from .components.control_panel import ControlPanel
 from .components.preset_browser import PresetBrowser
 from .components.progress_modal import ProgressModal
 from .components.update_modal import UpdateModal
+from .components.analysis_modal import AnalysisModal
 from ..utils.updater import check_for_updates
 
 logger = logging.getLogger(__name__)
@@ -51,6 +53,7 @@ class MainWindow(ctk.CTk):
         self.icons: Dict[str, ctk.CTkImage] = {}
         self.step_cards: Dict[str, StepCard] = {}
         self.control_panel: Optional[ControlPanel] = None
+        self.analysis_modal: Optional[AnalysisModal] = None
         
         # Yapılandırma
         self.config = ConfigManager()
@@ -194,6 +197,9 @@ class MainWindow(ctk.CTk):
         # Gelişmiş ayarlar değişkeni
         self.advanced_settings = {}
         
+        # Başlangıç durumunu güncelle (step=0 için "Adım 1" mesajını göster)
+        self._update_status()
+        
         # Uygulama başlangıcında otomatik güncelleme kontrolü (5 saniye sonra)
         self.after(5000, self._auto_check_updates)
     
@@ -332,6 +338,14 @@ class MainWindow(ctk.CTk):
                     
                     self.step_cards["ham"].update_path(label_text)
                     self.step_cards["ham"].update_analysis("Analiz ediliyor...", "gray")
+                    
+                    # Analiz popup'ını göster
+                    if self.analysis_modal:
+                        try:
+                            self.analysis_modal.close()
+                        except:
+                            pass
+                    self.analysis_modal = AnalysisModal(self)
                     
                     # Arka planda analiz
                     self._run_analysis_in_background(self.ham_paths)
@@ -539,6 +553,14 @@ class MainWindow(ctk.CTk):
     
     def _update_analysis_ui(self):
         """Analiz sonuçlarını UI'da gösterir"""
+        # Analiz popup'ını kapat
+        if self.analysis_modal:
+            try:
+                self.analysis_modal.close()
+                self.analysis_modal = None
+            except:
+                pass
+        
         count = sum(len(v) for v in self.analyzed_segments_map.values())
         
         if count > 0:
@@ -557,7 +579,24 @@ class MainWindow(ctk.CTk):
         self._update_status()
     
     def _update_status(self):
-        """Durum mesajını günceller"""
+        """Durum mesajını günceller ve progress bar'ı günceller"""
+        # Progress bar güncellemesi
+        if self.ham_paths:
+            if self.fon_paths:
+                if self.ending_paths:
+                    # Ham + Fon + Bitiş = Adım 3
+                    self.control_panel.update_selection_progress(3)
+                else:
+                    # Ham + Fon = Adım 2
+                    self.control_panel.update_selection_progress(2)
+            else:
+                # Sadece Ham = Adım 1
+                self.control_panel.update_selection_progress(1)
+        else:
+            # Hiçbir şey seçilmemiş = 0
+            self.control_panel.update_selection_progress(0)
+        
+        # Durum mesajı güncellemesi
         if self.ham_paths and self.fon_paths:
             if not self.output_path:
                 # Varsayılan çıktı yolu
@@ -591,6 +630,10 @@ class MainWindow(ctk.CTk):
                 "Lütfen Ham Ses ve Fon Müziği seçin."
             )
             return
+        
+        # Progress bar'ı Adım 4'e (100%) güncelle ve "Montaj başlatılıyor" mesajını göster
+        self.control_panel.update_selection_progress(4)
+        self.control_panel.update_status("Montaj başlatılıyor...", "#007BFF")
         
         # UI'ı işlem moduna al
         self.control_panel.set_processing(True)
@@ -857,7 +900,18 @@ class MainWindow(ctk.CTk):
         # Çıktı klasörünü aç (Windows)
         try:
             import subprocess
-            subprocess.Popen(f'explorer "{output_folder}"', shell=True)
+            if sys.platform == "win32":
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE
+                subprocess.Popen(
+                    f'explorer "{output_folder}"',
+                    shell=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                    startupinfo=startupinfo
+                )
+            else:
+                subprocess.Popen(f'explorer "{output_folder}"', shell=True)
         except Exception:
             pass
         
@@ -1129,8 +1183,13 @@ class MainWindow(ctk.CTk):
             
             logger.info(f"Setup dosyası indirildi: {setup_path}")
             
-            # Setup'ı çalıştır ve programı kapat
-            subprocess.Popen([setup_path], shell=True)
+            # Setup'ı çalıştır (gizli değil, kullanıcı setup'ı görmeli)
+            # Ancak yine de CREATE_NO_WINDOW kullanmayalım çünkü setup penceresi görünmeli
+            if sys.platform == "win32":
+                # Windows'ta setup'ı normal şekilde çalıştır (görünür)
+                subprocess.Popen([setup_path], shell=True)
+            else:
+                subprocess.Popen([setup_path], shell=True)
             
             # Programı kapat
             self.after(1000, lambda: self._force_close())
@@ -1188,7 +1247,7 @@ class MainWindow(ctk.CTk):
                         for chunk in response.iter_content(chunk_size=8192):
                             f.write(chunk)
                     
-                    # Setup'ı çalıştır
+                    # Setup'ı çalıştır (görünür olmalı)
                     subprocess.Popen([setup_path], shell=True)
                     
                     # Flag'leri temizle
@@ -1197,7 +1256,7 @@ class MainWindow(ctk.CTk):
                     self.config.save()
                     
                 except Exception as e:
-                    logger.error(f"Kapanışta güncelleme hatası: {e}")
+                    logger.error(f"Kapanışta güncelleme hatası: {e}", exc_info=True)
             
             self._save_settings()
             self.is_cancelled = True

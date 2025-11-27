@@ -321,10 +321,37 @@ def ses_montaj(
                 # Bitiş seçilmişse: Fon sesini ham ses bitiminde kes, ardına bitişi ekle
                 # Fon sesini ham ses bitimine kadar kullan (fade-out yok)
                 final_background = prelim_background
-                # Bitişi ekle
+                
+                # Bitiş sesini final_background ile uyumlu hale getir
+                # Frame rate uyumluluğu
                 if ending_segment.frame_rate != final_background.frame_rate:
                     ending_segment = ending_segment.set_frame_rate(final_background.frame_rate)
-                final_background = final_background.append(ending_segment, crossfade=0)
+                
+                # Channels uyumluluğu
+                if ending_segment.channels != final_background.channels:
+                    ending_segment = ending_segment.set_channels(final_background.channels)
+                
+                # Bitiş sesinin başlangıcına daha uzun ve yumuşak fade-in ekle
+                # İlk 200-300ms'ye fade-in uygula (daha yumuşak geçiş için)
+                fade_in_duration = min(300, max(200, len(ending_segment) // 3))  # 200-300ms veya bitiş sesinin %33'ü
+                if fade_in_duration > 50:  # Minimum 50ms fade-in
+                    # Pydub'un fade_in metodunu kullan (daha yumuşak ve doğal)
+                    ending_segment = ending_segment.fade_in(fade_in_duration)
+                    logger.debug(f"Bitiş sesine {fade_in_duration}ms yumuşak fade-in uygulandı")
+                
+                # Fon müziğinin sonuna kısa fade-out ekle (yumuşak geçiş için)
+                # Son 50ms'ye fade-out uygula
+                fade_out_duration = 50
+                if len(final_background) > fade_out_duration:
+                    bg_end = final_background[-fade_out_duration:]
+                    bg_rest = final_background[:-fade_out_duration]
+                    bg_end = bg_end.fade_out(fade_out_duration)
+                    final_background = bg_rest + bg_end
+                    logger.debug(f"Fon müziğinin sonuna {fade_out_duration}ms fade-out uygulandı")
+                
+                # Append işlemi - crossfade ile yumuşak geçiş
+                crossfade_ms = 50  # 50ms crossfade
+                final_background = final_background.append(ending_segment, crossfade=crossfade_ms)
             else:
                 # Bitiş seçilmemişse: Normal fade-out
                 final_background = (

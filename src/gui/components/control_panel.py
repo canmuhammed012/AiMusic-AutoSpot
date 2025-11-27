@@ -153,41 +153,108 @@ class ControlPanel(ctk.CTkFrame):
         
         # Durum ve ilerleme
         status_frame = ctk.CTkFrame(self, fg_color="transparent")
-        status_frame.pack(fill="x", pady=(0, 5))
+        status_frame.pack(fill="x", pady=(0, 10))
         status_frame.grid_columnconfigure(0, weight=1)
         
+        # "Montaja Başlamak İçin Dosyaları Seçin" yazısı (ortalanmış, her zaman görünür)
         self.status_label = ctk.CTkLabel(
             status_frame,
-            text="Başlamak için dosyaları seçin...",
-            font=ctk.CTkFont(family=FONT_FAMILY, size=14),
+            text="Montaja Başlamak İçin Dosyaları Seçin",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=16, weight="bold"),
             text_color="gray60",
-            wraplength=250,
-            justify="left",
-            height=40,
-            anchor="w"
+            height=30
         )
-        self.status_label.grid(row=0, column=0, sticky="w")
+        self.status_label.grid(row=0, column=0, sticky="")
         
-        # İlerleme çubuğu
+        # İlerleme çubuğu (dosya seçim aşaması için)
         progress_frame = ctk.CTkFrame(self, fg_color="transparent")
-        progress_frame.pack(fill="x", pady=(5, 0))
+        progress_frame.pack(pady=(0, 8))  # fill="x" kaldırıldı, genişleme yok
         progress_frame.grid_columnconfigure(0, weight=1)
-        progress_frame.grid_columnconfigure(1, weight=0)
         
-        self.progress_bar = ctk.CTkProgressBar(progress_frame, mode="determinate")
+        # Progress bar container (4 kademe için)
+        bar_container = ctk.CTkFrame(progress_frame, fg_color="transparent")
+        bar_container.grid(row=0, column=0, sticky="", pady=(0, 8))
+        
+        # 4 kademe göstergesi (progress bar üstünde)
+        steps_frame = ctk.CTkFrame(bar_container, fg_color="transparent")
+        steps_frame.grid(row=0, column=0, sticky="", pady=(0, 5))
+        steps_frame.grid_columnconfigure(0, weight=1)
+        steps_frame.grid_columnconfigure(1, weight=1)
+        steps_frame.grid_columnconfigure(2, weight=1)
+        steps_frame.grid_columnconfigure(3, weight=1)
+        
+        self.step_labels = []
+        for i in range(4):
+            step_label = ctk.CTkLabel(
+                steps_frame,
+                text=str(i + 1),
+                font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold"),
+                text_color=("#666", "#999"),
+                width=30,
+                height=25
+            )
+            # Her adımı eşit aralıklarla yerleştir
+            step_label.grid(row=0, column=i, sticky="")
+            self.step_labels.append(step_label)
+        
+        # Ana progress bar (sabit genişlik)
+        self.selection_progress_bar = ctk.CTkProgressBar(bar_container, mode="determinate", width=280)
+        self.selection_progress_bar.grid(row=1, column=0, sticky="", ipady=5)
+        self.selection_progress_bar.set(0)
+        
+        # Adım mesajı (progress bar altında) - Sabit yükseklik
+        message_container = ctk.CTkFrame(progress_frame, fg_color="transparent")
+        message_container.grid(row=1, column=0, sticky="")
+        message_container.configure(height=50)  # Sabit yükseklik (opsiyonel mesaj için yer)
+        message_container.grid_propagate(False)  # Grid için yüksekliği sabit tut
+        
+        self.step_message_label = ctk.CTkLabel(
+            message_container,
+            text="",
+            font=ctk.CTkFont(family=FONT_FAMILY, size=13),
+            text_color=("#333", "#EEE"),
+            height=25,
+            wraplength=280  # Metin genişliğini sınırla (progress bar genişliğiyle uyumlu)
+        )
+        self.step_message_label.grid(row=0, column=0, sticky="")
+        
+        # Adım 3 için ek mesaj (opsiyonel bilgi) - Her zaman görünür, boş text ile yer kaplar
+        self.step_optional_label = ctk.CTkLabel(
+            message_container,
+            text=" ",  # Boşluk karakteri ile yer kaplar
+            font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold"),  # Daha büyük ve bold
+            text_color=("gray50", "gray70"),
+            height=20,
+            wraplength=280  # Metin genişliğini sınırla
+        )
+        self.step_optional_label.grid(row=1, column=0, sticky="", pady=(2, 0))
+        
+        # Montaj ilerleme çubuğu (montaj sırasında kullanılacak)
+        montage_progress_frame = ctk.CTkFrame(self, fg_color="transparent")
+        montage_progress_frame.pack(fill="x", pady=(5, 0))
+        montage_progress_frame.grid_columnconfigure(0, weight=1)
+        montage_progress_frame.grid_columnconfigure(1, weight=0)
+        montage_progress_frame.pack_forget()  # Başlangıçta gizli
+        
+        self.progress_bar = ctk.CTkProgressBar(montage_progress_frame, mode="determinate")
         self.progress_bar.grid(row=0, column=0, sticky="ew", ipady=2)
         self.progress_bar.set(0)
         
         self.progress_label = ctk.CTkLabel(
-            progress_frame,
+            montage_progress_frame,
             text="",
             font=ctk.CTkFont(family=FONT_FAMILY, size=12),
             text_color=("#333", "#EEE")
         )
         self.progress_label.grid(row=0, column=1, padx=(5, 0), sticky="e")
         
+        # Frame referanslarını sakla
+        self.progress_frame = progress_frame
+        self.montage_progress_frame = montage_progress_frame
+        
         # Aksiyon butonları
         action_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.action_frame = action_frame  # Action frame referansını sakla
         action_frame.pack(fill="x", pady=(5, 0))
         
         self.start_button = ctk.CTkButton(
@@ -302,17 +369,98 @@ class ControlPanel(ctk.CTkFrame):
             self.on_cancel()
     
     def update_status(self, text: str, color: str = "gray60"):
-        """Durum etiketini günceller"""
-        self.status_label.configure(text=text, text_color=color)
+        """
+        Durum etiketini günceller (artık kullanılmıyor, status_label sabit kalıyor)
+        Bu fonksiyon geriye dönük uyumluluk için boş bırakıldı.
+        """
+        # Status label artık sabit "Montaja Başlamak İçin Dosyaları Seçin" olarak kalıyor
+        # Durum mesajları artık step_message_label'da gösteriliyor
+        pass
+    
+    def update_selection_progress(self, step: int, total_steps: int = 4):
+        """
+        Dosya seçim aşaması progress bar'ını günceller.
+        
+        Args:
+            step: Mevcut adım (0-4, 0 = hiçbir şey seçili değil)
+            total_steps: Toplam adım sayısı (varsayılan 4)
+        """
+        progress = (step / total_steps) * 100 if step > 0 else 0
+        self.selection_progress_bar.set(progress / 100.0)
+        
+        # Adım mesajları (bir sonraki adımın mesajını göster)
+        # step=0 → Adım 1 mesajı, step=1 → Adım 2 mesajı, vb.
+        step_messages = {
+            1: "Adım 1: Ham Sesinizi Yükleyiniz!",
+            2: "Adım 2: Lütfen Fon Seçiniz ya da Yükleyiniz.",
+            3: "Adım 3: Lütfen Bitiş Sesinizi Seçiniz ya da Yükleyiniz.",
+            4: "Adım 4: Montajı Başlatabilirsiniz!"
+        }
+        
+        # Status label her zaman görünür (text değişmez, sabit kalır)
+        self.status_label.grid()
+        
+        # Bir sonraki adımın mesajını göster (step+1)
+        # step=0 → Adım 1 mesajı, step=1 → Adım 2 mesajı, vb.
+        next_step = step + 1
+        if next_step <= 4:
+            current_message = step_messages.get(next_step, "")
+        else:
+            # step=4 ise (montaj başladı) özel mesaj
+            current_message = "Montaj başlatılıyor..."
+        
+        self.step_message_label.configure(text=current_message)
+        
+        # Adım 3 için opsiyonel bilgi mesajı (parantez içinde, bold ve büyük punto)
+        if next_step == 3:
+            self.step_optional_label.configure(
+                text="(Dilerseniz yalnızca Ham Ses ve Fon Müzik ile montajı başlatabilirsiniz.)",
+                font=ctk.CTkFont(family=FONT_FAMILY, size=13, weight="bold")  # Bold ve büyük punto
+            )
+        else:
+            # Görünmez yap ama yer kaplamaya devam et (boşluk karakteri)
+            self.step_optional_label.configure(text=" ")
+        
+        # Adım numaralarını vurgula
+        for i, label in enumerate(self.step_labels):
+            if i < step:
+                # Tamamlanan adımlar
+                label.configure(
+                    text_color="#28A745",
+                    font=ctk.CTkFont(family=FONT_FAMILY, size=10, weight="bold")
+                )
+            elif i == step - 1:
+                # Mevcut adım
+                label.configure(
+                    text_color="#007BFF",
+                    font=ctk.CTkFont(family=FONT_FAMILY, size=12, weight="bold")
+                )
+            else:
+                # Gelecek adımlar
+                label.configure(
+                    text_color=("#666", "#999"),
+                    font=ctk.CTkFont(family=FONT_FAMILY, size=10, weight="bold")
+                )
     
     def update_progress(self, value: int, message: str = ""):
         """
-        İlerleme çubuğunu günceller.
+        Montaj ilerleme çubuğunu günceller.
         
         Args:
             value: İlerleme değeri (0-100)
             message: Durum mesajı
         """
+        # Dosya seçim progress bar'ını gizle, montaj progress bar'ını göster
+        if value > 0:
+            self.progress_frame.pack_forget()
+            # Progress bar'ı action frame'den önce (üstünde) göstermek için
+            # Action frame'i geçici olarak kaldırıp, progress bar'ı ekleyip, sonra action frame'i tekrar ekle
+            action_pack_info = self.action_frame.pack_info()
+            self.action_frame.pack_forget()
+            self.montage_progress_frame.pack(fill="x", pady=(5, 0))
+            # Action frame'i tekrar ekle (progress bar'ın altına)
+            self.action_frame.pack(**action_pack_info)
+        
         self.progress_bar.set(value / 100.0)
         self.progress_label.configure(text=f"%{int(value)}" if value > 0 else "")
         if message:
@@ -330,6 +478,10 @@ class ControlPanel(ctk.CTkFrame):
         self.cancel_button.configure(state="normal" if processing else "disabled")
         
         if not processing:
+            # Montaj progress bar'ını gizle, dosya seçim progress bar'ını göster
+            self.montage_progress_frame.pack_forget()
+            self.progress_frame.pack(fill="x", pady=(5, 0))
+            
             self.progress_bar.set(0)
             self.progress_label.configure(text="")
     
