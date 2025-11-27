@@ -1058,6 +1058,7 @@ class MainWindow(ctk.CTk):
                     f"Güncelleme kontrol edilemedi:\n\n{error}"
                 )
             else:
+                # Hata yoksa güncel demektir
                 messagebox.showinfo(
                     "Güncelleme Kontrolü",
                     "Uygulamanız güncel!\n\n"
@@ -1089,6 +1090,7 @@ class MainWindow(ctk.CTk):
                     if remind_version != update_info.get("version", ""):
                         # Yeni güncelleme veya hatırlatma zamanı geldi
                         self.after(0, lambda: self._show_update_modal(update_info))
+                # 404 hatası (release yok) sessizce geçilir - bu normal
             except Exception as e:
                 logger.debug(f"Otomatik güncelleme kontrolü hatası: {e}")
         

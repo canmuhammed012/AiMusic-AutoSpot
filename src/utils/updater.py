@@ -36,7 +36,16 @@ def check_for_updates(current_version: str, timeout: int = 5) -> Dict[str, Any]:
         
         # GitHub API'den son release'i al
         response = requests.get(GITHUB_API_URL, timeout=timeout)
-        response.raise_for_status()
+        
+        # 404 hatası (release yok) normal bir durum
+        if response.status_code == 404:
+            logger.debug("Henüz release oluşturulmamış (404)")
+            return {
+                "available": False,
+                "error": None  # Hata değil, sadece release yok
+            }
+        
+        response.raise_for_status()  # Diğer HTTP hataları için
         
         data = response.json()
         latest_version = data.get("tag_name", "").lstrip("v")  # "v8.0.0" -> "8.0.0"
@@ -82,14 +91,20 @@ def check_for_updates(current_version: str, timeout: int = 5) -> Dict[str, Any]:
                 "error": f"Versiyon formatı geçersiz: {e}"
             }
             
+    except requests.exceptions.HTTPError as e:
+        logger.warning(f"Güncelleme kontrolü HTTP hatası: {e}")
+        return {
+            "available": False,
+            "error": f"HTTP hatası: {e.response.status_code if hasattr(e, 'response') else 'Bilinmiyor'}"
+        }
     except requests.exceptions.Timeout:
-        logger.warning("Güncelleme kontrolü zaman aşımına uğradı")
+        logger.debug("Güncelleme kontrolü zaman aşımına uğradı")
         return {
             "available": False,
             "error": "Bağlantı zaman aşımına uğradı"
         }
     except requests.exceptions.RequestException as e:
-        logger.warning(f"Güncelleme kontrolü başarısız: {e}")
+        logger.debug(f"Güncelleme kontrolü başarısız: {e}")
         return {
             "available": False,
             "error": f"Bağlantı hatası: {str(e)}"
