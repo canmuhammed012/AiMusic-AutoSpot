@@ -25,10 +25,8 @@ class ProgressModal(ctk.CTkToplevel):
         ]
         self.stage_widgets = []
         self.is_completed = False
-        self.spinner_angle = 0  # Çark döndürme açısı
+        self.spinner_angle = 0  # Kum saati döndürme açısı
         self.current_spot_info = ""  # Mevcut spot bilgisi
-        self.hourglass_flipped = False  # Kum saati ters durumu
-        self.montage_stage_active = False  # "Montaj Tamamlanıyor" aşaması aktif mi?
         self.animation_job = None  # Animasyon işi için referans
         
         self._setup_window()
@@ -112,10 +110,10 @@ class ProgressModal(ctk.CTkToplevel):
         top_section = ctk.CTkFrame(content_frame, fg_color="transparent")
         top_section.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
         
-        # En üstte dönen çark
+        # En üstte dönen kum saati
         self.top_spinner = ctk.CTkLabel(
             top_section,
-            text="⚙",
+            text="⏳",
             font=ctk.CTkFont(family=FONT_FAMILY, size=48),
             text_color="#007BFF"
         )
@@ -206,10 +204,10 @@ class ProgressModal(ctk.CTkToplevel):
         """Aşama satırı oluşturur"""
         row = ctk.CTkFrame(self.stages_frame, fg_color="transparent")
         
-        # İkon (çark veya tik)
+        # İkon (kum saati veya tik)
         icon_label = ctk.CTkLabel(
             row,
-            text="⚙",
+            text="",
             font=ctk.CTkFont(family=FONT_FAMILY, size=20),
             text_color="#007BFF",
             width=30
@@ -238,134 +236,54 @@ class ProgressModal(ctk.CTkToplevel):
         self._animate_spinner()
     
     def _animate_spinner(self):
-        """Çark animasyonu - üst çark ve aktif aşamalar için"""
+        """Kum saati animasyonu - sürekli dönen kum saati"""
         if self.is_completed:
             return
         
-        # "Montaj Tamamlanıyor" aşaması aktifse normal animasyonu tamamen durdur
-        # Sadece kum saati animasyonu çalışacak
-        if self.montage_stage_active:
-            # Diğer tüm aşamaların ikonlarını kontrol et ve emoji görünmesin
-            for i, row in enumerate(self.stage_widgets):
-                if i < 2:  # İlk iki aşama
-                    if row.is_completed:
-                        row.icon_label.configure(text="✓", text_color="#28A745")
-                    else:
-                        row.icon_label.configure(text="", text_color="#28A745")
-            return  # Kum saati animasyonu _flip_hourglass tarafından yönetiliyor
+        # Kum saati döndürme animasyonu (sürekli dönsün)
+        # Dönen kum saati karakterleri: ⏳ → ⏲ → ⏳ (tersine çevirme efekti)
+        hourglass_chars = ["⏳", "⏲"]
+        self.spinner_angle = (self.spinner_angle + 1) % len(hourglass_chars)
+        current_hourglass = hourglass_chars[self.spinner_angle]
         
-        # Normal animasyon (diğer aşamalar için)
-        # Üst çark animasyonu (Unicode döndürme karakterleri)
-        spinner_chars = ["⚙", "⏳", "⏰", "🔄"]
-        self.spinner_angle = (self.spinner_angle + 1) % len(spinner_chars)
-        self.top_spinner.configure(text=spinner_chars[self.spinner_angle])
+        # Üst spinner'ı sürekli döndür
+        self.top_spinner.configure(text=current_hourglass)
         
-        # Aktif aşamalar için çark animasyonu (henüz tamamlanmamış olanlar)
+        # Aktif aşamalar için kum saati göster (henüz tamamlanmamış olanlar)
         for i, row in enumerate(self.stage_widgets):
             if not row.is_completed:
-                # "Montaj Tamamlanıyor" aşaması değilse normal animasyon
-                if i != 2:
-                    # Her aşama için ayrı animasyon açısı
-                    if not hasattr(row, 'spinner_angle'):
-                        row.spinner_angle = 0
-                    row.spinner_angle = (row.spinner_angle + 1) % len(spinner_chars)
-                    row.icon_label.configure(text=spinner_chars[row.spinner_angle])
+                # Aktif aşama için kum saati göster
+                row.icon_label.configure(text=current_hourglass, text_color="#007BFF")
+            else:
+                # Tamamlanmış aşamalar için tik işareti
+                row.icon_label.configure(text="✓", text_color="#28A745")
         
-        # 100ms sonra tekrar çağır ve job ID'yi sakla
-        self.animation_job = self.after(100, self._animate_spinner)
+        # 150ms sonra tekrar çağır (sürekli dönsün, duraksamadan - daha hızlı)
+        self.animation_job = self.after(150, self._animate_spinner)
     
     def _update_hourglass(self):
-        """Kum saati emojisini güncelle - sadece kum saati göster"""
-        if not self.montage_stage_active or self.is_completed:
-            return
-        
-        # Kum saati emojileri: ⏳ (normal) ve ⏲ (akışlı kum - ters görünümlü)
-        # Baş aşağı dönme efekti için bu iki emoji arasında geçiş yapıyoruz
-        if self.hourglass_flipped:
-            hourglass_emoji = "⏲"  # Akışlı kum saati (ters görünümlü)
-        else:
-            hourglass_emoji = "⏳"  # Normal kum saati
-        
-        # Üst spinner'ı sadece kum saati yap (diğer emojiler görünmesin)
-        self.top_spinner.configure(text=hourglass_emoji)
-        
-        # "Montaj Tamamlanıyor" aşamasının ikonunu sadece kum saati yap
-        if len(self.stage_widgets) > 2:
-            montage_row = self.stage_widgets[2]  # Index 2 = "Montaj Tamamlanıyor"
-            if not montage_row.is_completed:
-                montage_row.icon_label.configure(text=hourglass_emoji)
-        
-        # Diğer tüm aşamaların ikonlarını kontrol et - emoji görünmemeli
-        for i, other_row in enumerate(self.stage_widgets):
-            if i < 2:  # İlk iki aşama
-                if other_row.is_completed:
-                    # Tamamlanmış aşamalar için tik işareti
-                    other_row.icon_label.configure(text="✓", text_color="#28A745")
-                else:
-                    # Tamamlanmamış aşamalar için boş (hiçbir emoji görünmesin)
-                    other_row.icon_label.configure(text="", text_color="#28A745")
+        """Kum saati emojisini güncelle - sadece kum saati göster (artık kullanılmıyor, _animate_spinner kullanılıyor)"""
+        # Bu fonksiyon artık kullanılmıyor, _animate_spinner sürekli animasyonu yönetiyor
+        pass
     
     def _flip_hourglass(self):
-        """Kum saatini tersine çevir (2 saniyede bir)"""
-        if self.montage_stage_active and not self.is_completed:
-            self.hourglass_flipped = not self.hourglass_flipped
-            # Kum saati emojisini güncelle
-            self._update_hourglass()
-            # 2 saniye sonra tekrar tersine çevir
-            self.after(2000, self._flip_hourglass)
+        """Kum saatini tersine çevir (artık kullanılmıyor, _animate_spinner sürekli animasyonu yönetiyor)"""
+        # Bu fonksiyon artık kullanılmıyor, _animate_spinner sürekli animasyonu yönetiyor
+        pass
     
     def update_stage(self, stage_index: int):
         """Aşamayı tamamlandı olarak işaretle"""
         if 0 <= stage_index < len(self.stage_widgets):
             row = self.stage_widgets[stage_index]
             if not row.is_completed:
-                # "Montaj Tamamlanıyor" aşaması (index 2) için özel işlem
-                if stage_index == 2:
-                    # Bu aşamada sadece kum saati animasyonu başlat
-                    self.montage_stage_active = True
-                    self.hourglass_flipped = False
-                    
-                    # Bekleyen animasyon işlerini iptal et
-                    if self.animation_job:
-                        self.after_cancel(self.animation_job)
-                        self.animation_job = None
-                    
-                    # Diğer aşamaların animasyonlarını durdur (sadece kum saati görünsün)
-                    # Diğer aşamaların (0 ve 1) ikonlarını sabit tut - HİÇBİR EMOJİ GÖRÜNMESİN
-                    for i, other_row in enumerate(self.stage_widgets):
-                        if i < 2:
-                            # Diğer aşamaların ikonlarını tamamen gizle veya sabit tut
-                            if other_row.is_completed:
-                                # Tamamlanmış aşamalar için tik işareti göster
-                                other_row.icon_label.configure(text="✓", text_color="#28A745")
-                            else:
-                                # Tamamlanmamış aşamalar için ikonu tamamen gizle
-                                # Veya boş string yap - hiçbir emoji görünmesin
-                                other_row.icon_label.configure(text="", text_color="#28A745")
-                    
-                    # Spot bilgisi label'ını gizle
-                    self.spot_info_label.pack_forget()
-                    
-                    # Üst spinner'ı hemen kum saati yap (diğer emojiler görünmesin)
-                    self.top_spinner.configure(text="⏳")
-                    
-                    # "Montaj Tamamlanıyor" aşamasının ikonunu kum saati yap
-                    row.icon_label.configure(text="⏳")
-                    
-                    # İlk kum saati güncellemesi (hemen başlat)
-                    self._update_hourglass()
-                    # 2 saniye sonra tersine çevir
-                    self.after(2000, self._flip_hourglass)
-                else:
-                    # Diğer aşamalar için normal işlem
-                    # Önce çarkı göster, sonra tik'e geç
-                    def set_completed():
-                        row.icon_label.configure(text="✓", text_color="#28A745")
-                        row.is_completed = True
-                        self.current_stage = stage_index + 1
-                    
-                    # Kısa bir gecikme ile tik göster (animasyon efekti)
-                    self.after(300, set_completed)
+                # Tüm aşamalar için aynı işlem: tamamlandı olarak işaretle
+                def set_completed():
+                    row.icon_label.configure(text="✓", text_color="#28A745")
+                    row.is_completed = True
+                    self.current_stage = stage_index + 1
+                
+                # Kısa bir gecikme ile tik göster (animasyon efekti)
+                self.after(300, set_completed)
     
     def update_spot_info(self, spot_info: str):
         """Spot bilgisini güncelle (örn: "Spot 2/5 işleniyor...")"""
@@ -380,12 +298,17 @@ class ProgressModal(ctk.CTkToplevel):
         """Tamamlanma mesajını göster"""
         self.is_completed = True
         
-        # Üst çarkı durdur ve kutlama emoji göster
-        self.top_spinner.configure(text="🎉", text_color="#28A745")
+        # Animasyonu durdur
+        if self.animation_job:
+            self.after_cancel(self.animation_job)
+            self.animation_job = None
+        
+        # Üst spinner'ı durdur (kum saati kalabilir veya boş bırakılabilir)
+        self.top_spinner.configure(text="✓", text_color="#28A745")
         
         # Sonuç frame'ini göster
         self.result_frame.grid()
-        self.result_emoji.configure(text="✅")
+        self.result_emoji.configure(text="✓")  # Sadece tik işareti, emoji yok
         self.result_label.configure(text=message, text_color="#28A745")
         
         # İptal butonunu gizle, tamamla butonunu göster

@@ -46,14 +46,14 @@ class SubprocessImportHook:
 def _hidden_popen(*args, **kwargs):
     """Gizli subprocess.Popen wrapper - CMD pencerelerini önler"""
     if sys.platform == "win32":
-        # Windows'ta CMD penceresini gizle
-        if 'creationflags' not in kwargs:
-            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-        if 'startupinfo' not in kwargs:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-            kwargs['startupinfo'] = startupinfo
+        # Windows'ta CMD penceresini MUTLAKA gizle
+        # creationflags'ı her zaman set et (override et)
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+        # startupinfo'yu her zaman set et (override et)
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        kwargs['startupinfo'] = startupinfo
         # stdout ve stderr'i gizle (eğer belirtilmemişse)
         if 'stdout' not in kwargs:
             kwargs['stdout'] = subprocess.DEVNULL
@@ -64,49 +64,45 @@ def _hidden_popen(*args, **kwargs):
 def _hidden_call(*args, **kwargs):
     """Gizli subprocess.call wrapper"""
     if sys.platform == "win32":
-        if 'creationflags' not in kwargs:
-            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-        if 'startupinfo' not in kwargs:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-            kwargs['startupinfo'] = startupinfo
+        # MUTLAKA gizle
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        kwargs['startupinfo'] = startupinfo
     return _original_call(*args, **kwargs)
 
 def _hidden_run(*args, **kwargs):
     """Gizli subprocess.run wrapper"""
     if sys.platform == "win32":
-        if 'creationflags' not in kwargs:
-            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-        if 'startupinfo' not in kwargs:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-            kwargs['startupinfo'] = startupinfo
+        # MUTLAKA gizle
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        kwargs['startupinfo'] = startupinfo
     return _original_run(*args, **kwargs)
 
 def _hidden_check_call(*args, **kwargs):
     """Gizli subprocess.check_call wrapper"""
     if sys.platform == "win32":
-        if 'creationflags' not in kwargs:
-            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-        if 'startupinfo' not in kwargs:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-            kwargs['startupinfo'] = startupinfo
+        # MUTLAKA gizle
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        kwargs['startupinfo'] = startupinfo
     return _original_check_call(*args, **kwargs)
 
 def _hidden_check_output(*args, **kwargs):
     """Gizli subprocess.check_output wrapper"""
     if sys.platform == "win32":
-        if 'creationflags' not in kwargs:
-            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
-        if 'startupinfo' not in kwargs:
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = subprocess.SW_HIDE
-            kwargs['startupinfo'] = startupinfo
+        # MUTLAKA gizle
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+        kwargs['startupinfo'] = startupinfo
     return _original_check_output(*args, **kwargs)
 
 def _patch_pydub_subprocess():
@@ -195,21 +191,53 @@ def _patch_pydub_subprocess():
         if hasattr(pydub.utils, '_run_ffmpeg'):
             original_run_ffmpeg = pydub.utils._run_ffmpeg
             def _patched_run_ffmpeg(*args, **kwargs):
-                # subprocess çağrılarını gizli yap
+                # subprocess çağrılarını MUTLAKA gizli yap
                 if 'popen_kwargs' not in kwargs:
                     kwargs['popen_kwargs'] = {}
                 if sys.platform == "win32":
+                    # MUTLAKA gizle (override et)
                     kwargs['popen_kwargs']['creationflags'] = subprocess.CREATE_NO_WINDOW
-                    if 'startupinfo' not in kwargs['popen_kwargs']:
-                        startupinfo = subprocess.STARTUPINFO()
-                        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                        startupinfo.wShowWindow = subprocess.SW_HIDE
-                        kwargs['popen_kwargs']['startupinfo'] = startupinfo
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = subprocess.SW_HIDE
+                    kwargs['popen_kwargs']['startupinfo'] = startupinfo
+                    # stdout ve stderr'i de gizle
+                    if 'stdout' not in kwargs['popen_kwargs']:
+                        kwargs['popen_kwargs']['stdout'] = subprocess.DEVNULL
+                    if 'stderr' not in kwargs['popen_kwargs']:
+                        kwargs['popen_kwargs']['stderr'] = subprocess.DEVNULL
                 return original_run_ffmpeg(*args, **kwargs)
             pydub.utils._run_ffmpeg = _patched_run_ffmpeg
             logger.debug("Pydub _run_ffmpeg patch'i uygulandı")
     except Exception as e:
         logger.debug(f"Pydub _run_ffmpeg patch hatası (normal olabilir): {e}")
+    
+    # 5.5. Pydub'un _run_ffprobe ve diğer internal fonksiyonlarını da patch et
+    try:
+        import pydub.utils
+        for func_name in ['_run_ffprobe', '_run_ffplay', '_run_command']:
+            if hasattr(pydub.utils, func_name):
+                original_func = getattr(pydub.utils, func_name)
+                def _make_patched_func(orig_func):
+                    def _patched_func(*args, **kwargs):
+                        if 'popen_kwargs' not in kwargs:
+                            kwargs['popen_kwargs'] = {}
+                        if sys.platform == "win32":
+                            kwargs['popen_kwargs']['creationflags'] = subprocess.CREATE_NO_WINDOW
+                            startupinfo = subprocess.STARTUPINFO()
+                            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                            startupinfo.wShowWindow = subprocess.SW_HIDE
+                            kwargs['popen_kwargs']['startupinfo'] = startupinfo
+                            if 'stdout' not in kwargs['popen_kwargs']:
+                                kwargs['popen_kwargs']['stdout'] = subprocess.DEVNULL
+                            if 'stderr' not in kwargs['popen_kwargs']:
+                                kwargs['popen_kwargs']['stderr'] = subprocess.DEVNULL
+                        return orig_func(*args, **kwargs)
+                    return _patched_func
+                setattr(pydub.utils, func_name, _make_patched_func(original_func))
+                logger.debug(f"Pydub {func_name} patch'i uygulandı")
+    except Exception as e:
+        logger.debug(f"Pydub internal fonksiyon patch hatası (normal olabilir): {e}")
     
     # 6. Pydub'un tüm internal modüllerini tarayarak subprocess referanslarını patch et
     try:
@@ -289,6 +317,24 @@ def _patch_pydub_subprocess():
         logger.debug("AudioSegment.export patch'i uygulandı")
     except Exception as e:
         logger.warning(f"AudioSegment.export patch'i uygulanamadı: {e}")
+    
+    # 9. Son güvenlik: Tüm subprocess referanslarını tekrar kontrol et ve patch'le
+    try:
+        import subprocess as sp
+        # Eğer hala orijinal fonksiyonlar varsa, tekrar patch'le
+        if sp.Popen is not _hidden_popen:
+            sp.Popen = _hidden_popen
+        if sp.call is not _hidden_call:
+            sp.call = _hidden_call
+        if sp.run is not _hidden_run:
+            sp.run = _hidden_run
+        if sp.check_call is not _hidden_check_call:
+            sp.check_call = _hidden_check_call
+        if sp.check_output is not _hidden_check_output:
+            sp.check_output = _hidden_check_output
+        logger.debug("Son güvenlik kontrolü: subprocess fonksiyonları patch'lendi")
+    except Exception as e:
+        logger.debug(f"Son güvenlik kontrolü hatası: {e}")
     
     # Patch tamamlandı - flag'i set et
     _subprocess_patched = True

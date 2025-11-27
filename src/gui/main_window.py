@@ -54,6 +54,7 @@ class MainWindow(ctk.CTk):
         self.step_cards: Dict[str, StepCard] = {}
         self.control_panel: Optional[ControlPanel] = None
         self.analysis_modal: Optional[AnalysisModal] = None
+        self._download_progress_modal: Optional[ProgressModal] = None
         
         # Yapılandırma
         self.config = ConfigManager()
@@ -1163,44 +1164,108 @@ class MainWindow(ctk.CTk):
     
     def _install_update_now(self, download_url: str):
         """Güncellemeyi şimdi yükle - programı kapat ve setup'ı çalıştır"""
-        try:
-            import tempfile
-            import requests
-            
-            logger.info(f"Güncelleme indiriliyor: {download_url}")
-            
-            # Setup dosyasını indir
-            response = requests.get(download_url, timeout=30, stream=True)
-            response.raise_for_status()
-            
-            # Geçici dosyaya kaydet
-            temp_dir = tempfile.gettempdir()
-            setup_path = os.path.join(temp_dir, "AiMusicAutoSpot_Update.exe")
-            
-            with open(setup_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            
-            logger.info(f"Setup dosyası indirildi: {setup_path}")
-            
-            # Setup'ı çalıştır (gizli değil, kullanıcı setup'ı görmeli)
-            # Ancak yine de CREATE_NO_WINDOW kullanmayalım çünkü setup penceresi görünmeli
-            if sys.platform == "win32":
-                # Windows'ta setup'ı normal şekilde çalıştır (görünür)
-                subprocess.Popen([setup_path], shell=True)
-            else:
-                subprocess.Popen([setup_path], shell=True)
-            
-            # Programı kapat
-            self.after(1000, lambda: self._force_close())
-            
-        except Exception as e:
-            logger.error(f"Güncelleme indirme hatası: {e}", exc_info=True)
-            messagebox.showerror(
-                "Güncelleme Hatası",
-                f"Güncelleme indirilemedi:\n\n{e}\n\n"
-                "Lütfen manuel olarak GitHub'dan indirin."
+        # İndirme işlemini ayrı thread'de çalıştır (UI donmasını önlemek için)
+        def download_in_thread():
+            try:
+                import tempfile
+                import requests
+                # Thread içinde subprocess'i import et (güvenlik için)
+                import subprocess as sp
+                
+                logger.info(f"Güncelleme indiriliyor: {download_url}")
+                
+                # Progress modal göster
+                self.after(0, lambda: self._show_download_progress())
+                
+                # Setup dosyasını indir
+                response = requests.get(download_url, timeout=60, stream=True)
+                response.raise_for_status()
+                
+                # Toplam dosya boyutu
+                total_size = int(response.headers.get('content-length', 0))
+                
+                # Geçici dosyaya kaydet
+                temp_dir = tempfile.gettempdir()
+                setup_path = os.path.join(temp_dir, "AiMusicAutoSpot_Update.exe")
+                
+                downloaded = 0
+                with open(setup_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            # Progress güncelle
+                            if total_size > 0:
+                                progress = (downloaded / total_size) * 100
+                                self.after(0, lambda p=progress: self._update_download_progress(p))
+                
+                logger.info(f"Setup dosyası indirildi: {setup_path}")
+                
+                # Progress modal'ı kapat
+                self.after(0, lambda: self._close_download_progress())
+                
+                # Setup'ı çalıştır (gizli değil, kullanıcı setup'ı görmeli)
+                if sys.platform == "win32":
+                    # Windows'ta setup'ı normal şekilde çalıştır (görünür)
+                    sp.Popen([setup_path], shell=True)
+                else:
+                    sp.Popen([setup_path], shell=True)
+                
+                # Programı kapat
+                self.after(1000, lambda: self._force_close())
+                
+            except ImportError as e:
+                error_msg = f"Modül import hatası: {str(e)}"
+                logger.error(f"Güncelleme indirme hatası: {error_msg}", exc_info=True)
+                self.after(0, lambda: self._close_download_progress())
+                self.after(0, lambda: messagebox.showerror(
+                    "Güncelleme Hatası",
+                    f"Güncelleme indirilemedi:\n\n{error_msg}\n\n"
+                    "Lütfen manuel olarak GitHub'dan indirin."
+                ))
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(f"Güncelleme indirme hatası: {error_msg}", exc_info=True)
+                self.after(0, lambda: self._close_download_progress())
+                self.after(0, lambda: messagebox.showerror(
+                    "Güncelleme Hatası",
+                    f"Güncelleme indirilemedi:\n\n{error_msg}\n\n"
+                    "Lütfen manuel olarak GitHub'dan indirin."
+                ))
+        
+        # Thread'i başlat
+        thread = threading.Thread(target=download_in_thread, daemon=True)
+        thread.start()
+    
+    def _show_download_progress(self):
+        """İndirme progress modal'ını göster"""
+        if not hasattr(self, '_download_progress_modal') or self._download_progress_modal is None:
+            self._download_progress_modal = ProgressModal(
+                self,
+                title="Güncelleme İndiriliyor",
+                message="Setup dosyası indiriliyor, lütfen bekleyin...",
+                show_cancel=False
             )
+    
+    def _update_download_progress(self, progress: float):
+        """İndirme progress'ini güncelle"""
+        if hasattr(self, '_download_progress_modal') and self._download_progress_modal:
+            try:
+                self._download_progress_modal.update_progress(progress)
+                self._download_progress_modal.update_message(
+                    f"Setup dosyası indiriliyor... %{progress:.1f}"
+                )
+            except Exception as e:
+                logger.debug(f"Progress güncelleme hatası: {e}")
+    
+    def _close_download_progress(self):
+        """İndirme progress modal'ını kapat"""
+        if hasattr(self, '_download_progress_modal') and self._download_progress_modal:
+            try:
+                self._download_progress_modal.destroy()
+                self._download_progress_modal = None
+            except Exception as e:
+                logger.debug(f"Progress modal kapatma hatası: {e}")
     
     def _remind_later(self, version: str, download_url: str):
         """Daha sonra hatırlat - flag'i kaydet"""
