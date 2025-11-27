@@ -64,6 +64,9 @@ desktop.ini
 # FFmpeg temp copies
 ses_montaj_ffmpeg/
 
+# FFmpeg binaries (too large for GitHub)
+ffmpeg/
+
 # Test coverage
 .coverage
 htmlcov/
