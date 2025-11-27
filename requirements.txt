@@ -1,0 +1,32 @@
+# Ses Montaj Projesi - Python Bağımlılıkları
+# Python 3.8+ gereklidir
+
+# GUI Framework
+customtkinter>=5.2.0
+Pillow>=10.0.0
+
+# Ses İşleme
+pydub>=0.25.1
+librosa>=0.10.0
+soundfile>=0.12.0
+audioread>=3.0.0
+
+# Bilimsel Hesaplamalar
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Librosa Bağımlılıkları
+resampy>=0.4.0
+numba>=0.57.0
+llvmlite>=0.40.0
+
+# Windows özellikleri (opsiyonel - pencere yönetimi için)
+pywin32>=305; sys_platform == "win32"
+
+# Güncelleme kontrolü
+requests>=2.31.0
+packaging>=23.0
+
+# Not: FFmpeg ayrıca sistemde kurulu olmalı veya proje klasöründe bulunmalıdır
+# FFmpeg: https://ffmpeg.org/download.html
+
